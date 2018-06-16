@@ -1,12 +1,12 @@
-from skimage.io import imread, imshow, imsave
 from sklearn.preprocessing import Normalizer
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import LabelBinarizer
 import cv2
 import matplotlib.pyplot as plt
-import numpy as np
 import os
 import re
+import random
+
+outliers_dict = {}
 
 
 def normalize(x):
@@ -128,3 +128,179 @@ def load_image(image_name, resize_path, origin_path, new_size, show_image=False)
         resize_image_array = image_load(resize_image_path, show_image)
     return resize_image_array
 
+
+def get_image_number(image_name):
+    '''?????????ID
+
+    Args:
+        image_name: ?????
+
+    Returns:
+        ??ID
+    '''
+    return re.split(r"[_.]", image_name)
+
+
+def is_outlier(outliers_dict, image_name, class_name):
+    '''???????????????????
+
+    Args:
+        outliers_dict: ?????
+        image_name: ?????
+        class_name: ???????
+
+    Returns:
+        true: ???????, ????????
+    '''
+    image_number = get_image_number(image_name)
+    image_array = outliers_dict[class_name]
+    return image_number in image_array
+
+
+def load_driver_feature(image_names, class_names, resize_path, origin_path, resize, show_image=False):
+    '''
+
+    Args:
+        image_names:
+        class_names:
+        resize_path:
+        origin_path:
+        resize:
+        show_image:
+
+    Returns:
+
+    '''
+    image_array = []
+    for image_name, class_name in zip(image_names, class_names):
+        if is_outlier(image_name, class_name):
+            continue
+        resize_class_path = resize_path + '/' + class_name
+        origin_class_path = origin_path + '/' + class_name
+        image_array.append(load_image(image_name, resize_class_path, origin_class_path, resize, show_image))
+    return image_array
+
+
+def append_outliers_to_dict(classname, outliers):
+    '''?????????????
+
+    Args:
+        classname: ?????
+        outliers: ???
+
+    Returns:
+        None
+    '''
+    outliers_dict[classname] = outliers
+
+
+def get_outliers_dict():
+    return outliers_dict
+
+
+def is_outlier(image_name, class_name):
+    '''???????????????????
+
+    Args:
+        image_name: ?????
+        class_name: ???????
+
+    Returns:
+        true: ???????, ????????
+    '''
+    image_number = get_image_number(image_name)
+    image_array = outliers_dict[class_name]
+    return image_number in image_array
+
+
+def load_driver_feature(image_names, class_names, resize_path, origin_path, resize):
+    '''????????????????????????
+
+    Args:
+        image_names: ????
+        class_names: ????
+        resize_path: ??????????
+        origin_path: ????????
+        resize: ????????
+
+    Returns:
+        ??????????????
+    '''
+    image_array = []
+    for image_name, class_name in zip(image_names, class_names):
+        if is_outlier(image_name, class_name):
+            continue
+        resize_class_path = resize_path + '/' + class_name
+        origin_class_path = origin_path + '/' + class_name
+        image_array.append(load_image(image_name, resize_class_path, origin_class_path, resize))
+    return image_array
+
+
+def load_feature_label(origin_df, driver, resize_path, origin_path, resize):
+    '''???driver id??????????????????????????????
+
+    Args:
+        origin_df: ?????????????
+        driver: ????
+        resize_path: ????????????
+        origin_path: ?????
+        resize: ?????????
+
+    Returns:
+        ????driver????????????????
+    '''
+    features = []
+    labels = []
+    classes = origin_df[origin_df['subject'] == driver].classname.values
+    images = origin_df[origin_df['subject'] == driver].img.values
+    image_array = load_driver_feature(
+        images,
+        classes,
+        resize_path,
+        origin_path,
+        resize)
+    features.extend(image_array)
+    labels.extend(one_hot_encode(classes))
+    return features, labels
+
+
+def train_valid_split(origin_df, valid_size, resize_path, origin_path, resize):
+    '''????????????????????????
+
+    Args:
+        origin_df: ?????????????
+        valid_size: ???:??????
+        resize_path: ?????????????
+        origin_path: ?????
+        resize: ????????
+
+    Returns:
+        ???????????????
+    '''
+    feature_train = []
+    label_train = []
+    feature_valid = []
+    label_valid = []
+    drivers = list(set(origin_df['subject']))
+    random.shuffle(drivers)
+    total = len(drivers)
+    valid_total = int(valid_size * total)
+    train_total = total - valid_total
+    print("Drivers size:%d valid_total:%d" % (len(drivers), valid_total))
+
+    for driver in drivers[:train_total]:
+        # print("Loading driver id:%s as train data" % driver)
+        features, labels = load_feature_label(origin_df, driver, resize_path, origin_path, resize)
+        feature_train.extend(features)
+        label_train.extend(labels)
+        # print("Loading finish. feature_train size:%d, label_train size:%d" % (len(feature_train), len(label_train)))
+
+    for driver in drivers[train_total:]:
+        # print("Loading driver id:%s as valid data" % driver)
+        features, labels = load_feature_label(origin_df, driver, resize_path, origin_path, resize)
+        feature_valid.extend(features)
+        label_valid.extend(labels)
+        # print("Loading finish. feature_valid size:%d, label_valid size:%d" % (len(feature_valid), len(label_valid)))
+
+    print("Loading completed")
+    return feature_train, label_train, feature_valid, label_valid
