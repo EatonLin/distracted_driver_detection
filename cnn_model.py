@@ -1,37 +1,57 @@
 import tensorflow as tf
 import tflearn
+from tensorflow.contrib.layers import max_pool2d
 from tflearn.layers.core import input_data, flatten, fully_connected, dropout
 from tflearn.layers.conv import conv_2d, max_pool_2d
 from tflearn.layers.estimator import regression
 
 
 def conv_maxpool(x, num_outputs, conv_ksize, conv_strides, pool_ksize, pool_strides):
-    layer = conv_2d(x, num_outputs, conv_ksize, conv_strides, padding='SAME')
-    layer = max_pool_2d(x, pool_ksize, pool_strides, padding='SAME')
+    layer = conv_2d(x,
+                    num_outputs,
+                    conv_ksize,
+                    conv_strides,
+                    padding='SAME',
+                    activation='relu',
+                    weights_init='normal',
+                    bias_init='normal')
+    layer = max_pool2d(layer, pool_ksize, pool_strides, padding='SAME')
     return layer
 
 
 def build_model(x, keep_prob, conv_ksize, conv_strides, pool_ksize, pool_strides):
-    conv_ksize = (3, 3)
-    conv_strides = (2, 2)
-    pool_ksize = (2, 2)
-    pool_strides = (2, 2)
-
     # First convolution & maxpooling
     layer = conv_maxpool(x, 64, conv_ksize, conv_strides, pool_ksize, pool_strides)
 
     # Second convolution & maxpooling
-    layer = conv_maxpool(x, 64, conv_ksize, conv_strides, pool_ksize, pool_strides)
+    layer = conv_maxpool(layer, 64, conv_ksize, conv_strides, pool_ksize, pool_strides)
+
+    # Second convolution & maxpooling
+    # layer = conv_maxpool(layer, 1024, conv_ksize, conv_strides, pool_ksize, pool_strides)
 
     # Flatten Layer
-    layer = flatten(x)
+    layer = flatten(layer)
 
     # Fully connect layer
-    layer_output = fully_connected(layer, 1024)
+    layer_output = fully_connected(
+        layer,
+        1024,
+        activation='relu',
+        weights_init='truncated_normal',
+        bias_init='truncated_normal')
     layer_output = dropout(layer_output, keep_prob)
-    layer_output = fully_connected(layer_output, 512)
-    # layer_output = dropout(layer_output, keep_prob)
-    layer_output = fully_connected(layer_output, 10)
+    layer_output = fully_connected(
+        layer_output,
+        512,
+        activation='relu',
+        weights_init='truncated_normal',
+        bias_init='truncated_normal')
+    #     layer_output = dropout(layer_output, keep_prob)
+    layer_output = fully_connected(
+        layer_output,
+        10,
+        weights_init='truncated_normal',
+        bias_init='truncated_normal')
 
     return layer_output
 
@@ -70,16 +90,22 @@ def run_cnn(
                 batch_data = x_train[i:i + batch_size, :]
                 batch_onehot_vals = y_train[i:i + batch_size, :]
                 _, c = s.run([optimizer, cost],
-                             feed_dict={tensor_x: batch_data, tensor_y: batch_onehot_vals, tensor_prob: keep_prob})
+                             feed_dict={tensor_x: batch_data, tensor_y: batch_onehot_vals, tensor_prob: 1.})
                 total_cost += c
-            print('Epoch {:>2}, Distracted driver Batch {}:  '.format(epoch + 1, i), end='')
-            loss = s.run(cost, feed_dict={tensor_x: x_train, tensor_y: y_train, tensor_prob: 1.0})
-            correct_pred = tf.equal(tf.argmax(y_pred, 1), tf.argmax(tensor_y, 1))
-            accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+            print('Epoch {:>2}, Distracted driver Batch {}:  Cost: {:<8.3f} '.format(epoch + 1, i, c, end=''))
+            #             loss = s.run(cost, feed_dict={tensor_x: x_train, tensor_y: y_train, tensor_prob: 1.0})
+
+    correct_pred = tf.equal(tf.argmax(y_pred, 1), tf.argmax(tensor_y, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    with tf.Session() as s:
+        s.run(tf.global_variables_initializer())
+        total_accuracy = 0
+        for i in range(0, len(x_valid), batch_size):
+            batch_data = x_valid[i:i + batch_size, :]
+            batch_data_labels = y_valid[i:i + batch_size, :]
             valid_accuracy = s.run(accuracy, feed_dict={
-                tensor_x: x_valid,
-                tensor_y: y_valid,
+                tensor_x: batch_data,
+                tensor_y: batch_data_labels,
                 tensor_prob: 1.})
-            print('Cost: {:<8.3f} Valid Accuracy: {:<5.3f}'.format(
-                loss,
-                valid_accuracy))
+            total_accuracy += valid_accuracy
+        print('Total Valid Accuracy: {:<5.3f}'.format(total_accuracy, end=''))
