@@ -264,7 +264,7 @@ def load_feature_label(origin_df, driver, resize_path, origin_path, resize):
     return features, labels
 
 
-def train_valid_split(origin_df, valid_size, resize_train_path, resize_valid_path, origin_path, resize):
+def train_valid_split(origin_df, valid_size, origin_path, resize_train_path, resize_valid_path, resize):
     '''你大爷
 
     Args:
@@ -304,3 +304,18 @@ def train_valid_split(origin_df, valid_size, resize_train_path, resize_valid_pat
 
     print("Loading completed")
     return feature_train, label_train, feature_valid, label_valid
+
+
+
+
+def train_test_resize(train_df, valid_size, origin_train_path, origin_test_path, resize_train_path, resize_valid_path, resize):
+    drivers = list(set(train_df['subject']))
+    random.shuffle(drivers)
+    total = len(drivers)
+    train_total = total - int(valid_size * total)
+
+    for driver in drivers[:train_total]:
+        load_feature_label(origin_df, driver, resize_train_path, origin_train_path, resize)
+
+    for driver in drivers[train_total:]:
+        load_feature_label(origin_df, driver, resize_valid_path, origin_test_path, resize)
