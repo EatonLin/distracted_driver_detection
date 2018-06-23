@@ -1,3 +1,4 @@
+import shutil
 from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import LabelBinarizer
 import cv2
@@ -306,16 +307,38 @@ def train_valid_split(origin_df, valid_size, origin_path, resize_train_path, res
     return feature_train, label_train, feature_valid, label_valid
 
 
+def copy_image(image_name, class_name, origin_path, target_path):
+    new_path = target_path + '/' + class_name
+    new_image_path = new_path + '/' + image_name
+    src_path = origin_path + '/' + class_name
+    src_image_path = src_path + '/' + image_name
+
+    # print(image_name, class_name, origin_path, target_path)
+    if not os.path.exists(new_path):
+        os.makedirs(new_path)
+
+    shutil.copyfile(src_image_path, new_image_path)
 
 
-def train_test_resize(train_df, valid_size, origin_train_path, origin_test_path, resize_train_path, resize_valid_path, resize):
+
+def splite_train_valid(train_df, valid_size, origin_path, resize_train_path, resize_valid_path):
     drivers = list(set(train_df['subject']))
     random.shuffle(drivers)
     total = len(drivers)
     train_total = total - int(valid_size * total)
 
+    print("--------Start spliting-----------")
+
     for driver in drivers[:train_total]:
-        load_feature_label(origin_df, driver, resize_train_path, origin_train_path, resize)
+        classes = train_df[train_df['subject'] == driver].classname.values
+        images = train_df[train_df['subject'] == driver].img.values
+        for class_name, image_name in zip(classes, images):
+            copy_image(image_name, class_name, origin_path, resize_train_path)
 
     for driver in drivers[train_total:]:
-        load_feature_label(origin_df, driver, resize_valid_path, origin_test_path, resize)
+        classes = train_df[train_df['subject'] == driver].classname.values
+        images = train_df[train_df['subject'] == driver].img.values
+        for class_name, image_name in zip(classes, images):
+            copy_image(image_name, class_name, origin_path, resize_train_path)
+
+    print("--------Spliting completed-----------")

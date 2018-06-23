@@ -1,5 +1,7 @@
 from abc import abstractmethod
 
+from distracted_driver_detection.preprocess_image import splite_train_valid
+
 
 class BaseModel(object):
     resize_train_path = ''
@@ -7,7 +9,7 @@ class BaseModel(object):
     def __init__(self):
         pass
 
-    def _preprocess(self, img_data_df, valid_size, origin_path, resize_train_path, resize_valid_path, resize_shape):
+    def __preprocess(self, img_data_df, valid_size, origin_path, resize_train_path, resize_valid_path):
         '''数据预处理
 
         Args:
@@ -21,12 +23,11 @@ class BaseModel(object):
         Returns:
 
         '''
-        # image_resize_and_split(img_data_df,
-        #                        valid_size,
-        #                        origin_path,
-        #                        resize_train_path,
-        #                        resize_valid_path,
-        #                        resize_shape)
+        splite_train_valid(img_data_df,
+                           valid_size,
+                           origin_path,
+                           resize_train_path,
+                           resize_valid_path)
 
     @abstractmethod
     def preprocess(self, img_data_df, valid_size, origin_path):
