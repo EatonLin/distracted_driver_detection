@@ -264,8 +264,8 @@ def load_feature_label(origin_df, driver, resize_path, origin_path, resize):
     return features, labels
 
 
-def train_valid_split(origin_df, valid_size, resize_path, origin_path, resize):
-    '''????????????????????????
+def train_valid_split(origin_df, valid_size, resize_train_path, resize_valid_path, origin_path, resize):
+    '''你大爷
 
     Args:
         origin_df: ?????????????
@@ -290,14 +290,14 @@ def train_valid_split(origin_df, valid_size, resize_path, origin_path, resize):
 
     for driver in drivers[:train_total]:
         # print("Loading driver id:%s as train data" % driver)
-        features, labels = load_feature_label(origin_df, driver, resize_path, origin_path, resize)
+        features, labels = load_feature_label(origin_df, driver, resize_train_path, origin_path, resize)
         feature_train.extend(features)
         label_train.extend(labels)
         # print("Loading finish. feature_train size:%d, label_train size:%d" % (len(feature_train), len(label_train)))
 
     for driver in drivers[train_total:]:
         # print("Loading driver id:%s as valid data" % driver)
-        features, labels = load_feature_label(origin_df, driver, resize_path, origin_path, resize)
+        features, labels = load_feature_label(origin_df, driver, resize_valid_path, origin_path, resize)
         feature_valid.extend(features)
         label_valid.extend(labels)
         # print("Loading finish. feature_valid size:%d, label_valid size:%d" % (len(feature_valid), len(label_valid)))
