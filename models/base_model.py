@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from preprocess_image import splite_train_valid
+from preprocess_image import train_valid_split
 
 
 class BaseModel(object):
@@ -9,7 +9,7 @@ class BaseModel(object):
     def __init__(self):
         pass
 
-    def _preprocess(self, img_data_df, valid_size, origin_path, resize_train_path, resize_valid_path):
+    def _preprocess(self, img_data_df, valid_size, origin_path, resize_train_path, resize_valid_path, resize):
         '''数据预处理
 
         Args:
@@ -23,11 +23,12 @@ class BaseModel(object):
         Returns:
 
         '''
-        splite_train_valid(img_data_df,
+        return train_valid_split(img_data_df,
                            valid_size,
                            origin_path,
                            resize_train_path,
-                           resize_valid_path)
+                           resize_valid_path,
+                           resize)
 
     @abstractmethod
     def preprocess(self, img_data_df, valid_size, origin_path):

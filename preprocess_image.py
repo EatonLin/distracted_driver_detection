@@ -1,8 +1,11 @@
 import shutil
+from keras.preprocessing import image
+from keras.preprocessing.image import img_to_array
 from sklearn.preprocessing import Normalizer
 from sklearn.preprocessing import LabelBinarizer
 import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import re
 import random
@@ -74,7 +77,8 @@ def image_load(image_path, show_image=False):
         cv2.destroyAllWindows()
         plt.imshow(img_load)
         plt.show()
-    return img_load
+    return np.asarray(img_load, dtype=np.float32)
+    
 
 
 def resize_image(resize_image_directory, image_path, resize, show_image=False):
@@ -123,10 +127,11 @@ def load_image(image_name, resize_path, origin_path, new_size, show_image=False)
     '''
     resize_image_path = resize_path + '/' + image_name
     origin_image_path = origin_path + '/' + image_name
-    if not os.path.exists(resize_image_path):
-        resize_image_array = resize_image(resize_path, origin_image_path, new_size, show_image)
-    else:
-        resize_image_array = image_load(resize_image_path, show_image)
+    # if not os.path.exists(resize_image_path):
+    #     resize_image_array = resize_image(resize_path, origin_image_path, new_size, show_image)
+    # else:
+    #     resize_image_array = image_load(resize_image_path, show_image)
+    resize_image_array = keras_image_load(origin_image_path, new_size)
     return resize_image_array
 
 
@@ -304,7 +309,12 @@ def train_valid_split(origin_df, valid_size, origin_path, resize_train_path, res
         # print("Loading finish. feature_valid size:%d, label_valid size:%d" % (len(feature_valid), len(label_valid)))
 
     print("Loading completed")
-    return feature_train, label_train, feature_valid, label_valid
+    x1 = np.array(feature_train, dtype=np.uint8)
+    x2 = np.array(feature_valid, dtype=np.uint8)
+    y1 = np.array(label_train)
+    y2 = np.array(label_valid)
+    return x1, y1, x2, y2
+#     return feature_train, label_train, feature_valid, label_valid
 
 
 def copy_load_image(image_name, class_name, origin_path, target_path):
@@ -348,3 +358,10 @@ def splite_train_valid(train_df, valid_size, origin_path, resize_train_path, res
 
     print("--------Spliting completed-----------")
     return train_array, valid_array
+
+
+def keras_image_load(image_path, new_size):
+    img = image.load_img(image_path, target_size=new_size)
+    img = image.img_to_array(img)
+    img = img.astype(dtype=np.uint8)
+    return img

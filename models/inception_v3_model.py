@@ -1,56 +1,54 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import os
 from keras import Model
 from keras.applications.inception_v3 import preprocess_input, InceptionV3
 from keras.layers import GlobalAveragePooling2D, Dense
+from keras.models import load_model 
 from keras.optimizers import Adagrad
 from keras.preprocessing.image import ImageDataGenerator
 
 from models.base_model import BaseModel
+from preprocess_image import keras_image_load
 
 
 class InceptionV3Model(BaseModel):
     def __init__(self, resize_path):
         self.model_name = 'inception_v3'
-        self.resize_train_path = resize_path + self.model_name + 'train/'
-        self.resize_valid_path = resize_path + self.model_name + 'valid/'
-        # self.resize_test_path = resize_path + self.model_name + 'test/'
+        self.model_file = self.model_name + '.pb'
+        self.resize_train_path = resize_path + self.model_name + '/' + 'train/'
+        self.resize_valid_path = resize_path + self.model_name + '/' + 'valid/'
+        self.resize_test_path = resize_path + self.model_name + '/' + 'test/'
         self.resize_img_shape = (299, 299)
-        # datagen = ImageDataGenerator(preprocessing_function=preprocess_input,  # ((x/255)-0.5)*2  归一化到±1之间
-        #                              rotation_range=30,
-        #                              width_shift_range=0.2,
-        #                              height_shift_range=0.2,
-        #                              shear_range=0.2,
-        #                              zoom_range=0.2,
-        #                              horizontal_flip=True)
-        self.datagen = {
-            'train': ImageDataGenerator(preprocessing_function=preprocess_input,  # ((x/255)-0.5)*2  归一化到±1之间
-                                        rotation_range=30,
-                                        width_shift_range=0.2,
-                                        height_shift_range=0.2,
-                                        shear_range=0.2,
-                                        zoom_range=0.2,
-                                        horizontal_flip=True),
-            'valid': ImageDataGenerator(preprocessing_function=preprocess_input,  # ((x/255)-0.5)*2  归一化到±1之间
+        self.x_train = None
+        self.x_valid = None
+        self.y_train = None
+        self.y_valid = None
+        self.history_tl = None
+        self.generator = ImageDataGenerator(preprocessing_function=preprocess_input,
                                         rotation_range=30,
                                         width_shift_range=0.2,
                                         height_shift_range=0.2,
                                         shear_range=0.2,
                                         zoom_range=0.2,
                                         horizontal_flip=True)
-        }
-        self.generator = {}
 
     def build_model(self):
         super().build_model()
 
     def preprocess(self, orgin_df, valid_size, train_path):
-        super()._preprocess(orgin_df, valid_size, train_path, self.resize_train_path, self.resize_valid_path)
-        self.generator['train'] = self.datagen['train'].flow_from_directory(directory=self.resize_train_path,
-                                                                            target_size=self.resize_img_shape,
-                                                                            batch_size=64)
-        self.generator['valid'] = self.datagen['valid'].flow_from_directory(directory=self.resize_valid_path,
-                                                                            target_size=self.resize_img_shape,
-                                                                            batch_size=64)
+        print('preprocess', len(self.x_train))
+        if len(self.x_train) == 0:
+            feature_train, label_train, feature_valid, label_valid = super()._preprocess(orgin_df, valid_size,
+                                                                                         train_path,
+                                                                                         self.resize_train_path,
+                                                                                         self.resize_valid_path,
+                                                                                         self.resize_img_shape)
+            self.x_train = feature_train
+            self.x_valid = feature_valid
+            self.y_train = label_train
+            self.y_valid = label_valid
+        self.generator.fit(self.x_train)
 
     def __build_model(self):
         base_model = InceptionV3(weights='imagenet', include_top=False)
@@ -74,7 +72,7 @@ class InceptionV3Model(BaseModel):
             layer.trainable = True
         model.compile(optimizer=Adagrad(lr=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
 
-    def __plot_training(history):
+    def __plot_training(self, history):
         acc = history.history['acc']
         val_acc = history.history['val_acc']
         loss = history.history['loss']
@@ -91,36 +89,46 @@ class InceptionV3Model(BaseModel):
         plt.title('Training and validation loss')
         plt.show()
 
-    def run(self):
+    def run(self, batch_size, epochs):
+        if os.path.exists(self.model_file):
+            print('Found model, loading...')
+            self.model = load_model(self.model_file)
+            return
+        
+        print('No train model, start training.')
         model = self.__build_model()
         self.__setup_to_transfer_learning(model)
 
         print("开始迁移学习:\n")
-
-        history_ft = model.fit_generator(
-            [],
-            steps_per_epoch=22424,
-            epochs=50,
-            validation_data=self.generator['valid'],
-            validation_steps=12,
-            class_weight='auto')
+        
+        history_tl = model.fit(self.x_train, self.y_train,
+                        batch_size=batch_size,
+                        epochs=epochs,
+                        validation_data=(self.x_valid, self.y_valid),
+                        shuffle=True)
 
         print("开始微调:\n")
 
-        # fine-tuning
-        self.__setup_to_finetune(model)
+#         # fine-tuning
+        self.__setup_to_fine_tune(model, model)
+    
+        history_tl = model.fit(self.x_train, self.y_train,
+                    batch_size=batch_size,
+                    epochs=epochs,
+                    validation_data=(self.x_valid, self.y_valid),
+                    shuffle=True)
 
-        history_ft = model.fit_generator(
-            self.generator['train'],
-            steps_per_epoch=22424,
-            epochs=50,
-            validation_data=self.generator['valid'],
-            validation_steps=1,
-            class_weight='auto')
-
-        model.save("inceptionv3_25000.model")
-
-        self.__plot_training(history_ft)
+        model.save(self.model_file)
+        self.history_tl = history_tl
+        self.model = model
+        
+    def plot_train(self):
+        self.__plot_training(self.model)
+    
+    def predict(self, image_path):
+        img_array = keras_image_load(image_path, self.resize_img_shape)
+        img_array = np.expand_dims(img_array, axis=0)
+        return self.model.predict(img_array)
 
     def print(self):
         print(self.model_name)
