@@ -307,7 +307,7 @@ def train_valid_split(origin_df, valid_size, origin_path, resize_train_path, res
     return feature_train, label_train, feature_valid, label_valid
 
 
-def copy_image(image_name, class_name, origin_path, target_path):
+def copy_load_image(image_name, class_name, origin_path, target_path):
     new_path = target_path + '/' + class_name
     new_image_path = new_path + '/' + image_name
     src_path = origin_path + '/' + class_name
@@ -318,6 +318,7 @@ def copy_image(image_name, class_name, origin_path, target_path):
         os.makedirs(new_path)
 
     shutil.copyfile(src_image_path, new_image_path)
+    return image_load(src_image_path)
 
 
 
@@ -326,6 +327,8 @@ def splite_train_valid(train_df, valid_size, origin_path, resize_train_path, res
     random.shuffle(drivers)
     total = len(drivers)
     train_total = total - int(valid_size * total)
+    train_array = []
+    valid_array = []
 
     print("--------Start spliting-----------")
 
@@ -333,12 +336,15 @@ def splite_train_valid(train_df, valid_size, origin_path, resize_train_path, res
         classes = train_df[train_df['subject'] == driver].classname.values
         images = train_df[train_df['subject'] == driver].img.values
         for class_name, image_name in zip(classes, images):
-            copy_image(image_name, class_name, origin_path, resize_train_path)
+            image_array = copy_load_image(image_name, class_name, origin_path, resize_train_path)
+            train_array.extend(image_array)
 
     for driver in drivers[train_total:]:
         classes = train_df[train_df['subject'] == driver].classname.values
         images = train_df[train_df['subject'] == driver].img.values
         for class_name, image_name in zip(classes, images):
-            copy_image(image_name, class_name, origin_path, resize_train_path)
+            image_array = copy_load_image(image_name, class_name, origin_path, resize_valid_path)
+            valid_array.extend(image_array)
 
     print("--------Spliting completed-----------")
+    return train_array, valid_array

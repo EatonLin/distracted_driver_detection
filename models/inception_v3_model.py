@@ -4,7 +4,9 @@ from keras.applications.inception_v3 import preprocess_input, InceptionV3
 from keras.layers import GlobalAveragePooling2D, Dense
 from keras.optimizers import Adagrad
 from keras.preprocessing.image import ImageDataGenerator
+
 from models.base_model import BaseModel
+
 
 class InceptionV3Model(BaseModel):
     def __init__(self, resize_path):
@@ -42,7 +44,7 @@ class InceptionV3Model(BaseModel):
         super().build_model()
 
     def preprocess(self, orgin_df, valid_size, train_path):
-        super().__preprocess(orgin_df, valid_size, train_path, self.resize_train_path, self.resize_valid_path)
+        super()._preprocess(orgin_df, valid_size, train_path, self.resize_train_path, self.resize_valid_path)
         self.generator['train'] = self.datagen['train'].flow_from_directory(directory=self.resize_train_path,
                                                                             target_size=self.resize_img_shape,
                                                                             batch_size=64)
@@ -61,7 +63,7 @@ class InceptionV3Model(BaseModel):
 
     def __setup_to_transfer_learning(self, model):  # base_model
         for layer in model.layers:
-            layer.trainable = False
+            layer.trainable = True
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     def __setup_to_fine_tune(self, model, base_model):
@@ -96,10 +98,10 @@ class InceptionV3Model(BaseModel):
         print("开始迁移学习:\n")
 
         history_ft = model.fit_generator(
-            self.datagen['train'],
+            [],
             steps_per_epoch=22424,
             epochs=50,
-            validation_data=self.datagen['valid'],
+            validation_data=self.generator['valid'],
             validation_steps=12,
             class_weight='auto')
 
@@ -109,10 +111,10 @@ class InceptionV3Model(BaseModel):
         self.__setup_to_finetune(model)
 
         history_ft = model.fit_generator(
-            self.datagen['train'],
+            self.generator['train'],
             steps_per_epoch=22424,
             epochs=50,
-            validation_data=self.datagen['valid'],
+            validation_data=self.generator['valid'],
             validation_steps=1,
             class_weight='auto')
 
