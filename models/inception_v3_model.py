@@ -33,12 +33,8 @@ class InceptionV3Model(BaseModel):
                                         zoom_range=0.2,
                                         horizontal_flip=True)
 
-    def build_model(self):
-        super().build_model()
-
     def preprocess(self, orgin_df, valid_size, train_path):
-        print('preprocess', len(self.x_train))
-        if len(self.x_train) == 0:
+        if self.x_train is None:
             feature_train, label_train, feature_valid, label_valid = super()._preprocess(orgin_df, valid_size,
                                                                                          train_path,
                                                                                          self.resize_train_path,
@@ -53,19 +49,19 @@ class InceptionV3Model(BaseModel):
     def __build_model(self):
         base_model = InceptionV3(weights='imagenet', include_top=False)
         x = base_model.output
-        x = GlobalAveragePooling2D()(x)  # GlobalAveragePooling2D 将 MxNxC 的张量转换成 1xC 张量，C是通道数
+        x = GlobalAveragePooling2D()(x)
         x = Dense(1024, activation='relu')(x)
         predictions = Dense(10, activation='softmax')(x)
         model = Model(inputs=base_model.input, outputs=predictions)
         return model
 
-    def __setup_to_transfer_learning(self, model):  # base_model
+    def __setup_to_transfer_learning(self, model):
         for layer in model.layers:
             layer.trainable = True
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     def __setup_to_fine_tune(self, model, base_model):
-        GAP_LAYER = 10  # max_pooling_2d_2
+        GAP_LAYER = 10
         for layer in base_model.layers[:GAP_LAYER + 1]:
             layer.trainable = False
         for layer in base_model.layers[GAP_LAYER + 1:]:
@@ -93,37 +89,40 @@ class InceptionV3Model(BaseModel):
         if os.path.exists(self.model_file):
             print('Found model, loading...')
             self.model = load_model(self.model_file)
+            print('Loading completed.')
             return
         
         print('No train model, start training.')
         model = self.__build_model()
         self.__setup_to_transfer_learning(model)
 
-        print("开始迁移学习:\n")
-        
-        history_tl = model.fit(self.x_train, self.y_train,
-                        batch_size=batch_size,
-                        epochs=epochs,
-                        validation_data=(self.x_valid, self.y_valid),
-                        shuffle=True)
+        print('Transfer learning...')
+        history_tl = model.fit(self.x_train,
+                               self.y_train,
+                               batch_size=batch_size,
+                               epochs=epochs,
+                               validation_data=(self.x_valid, self.y_valid),
+                               shuffle=True)
+        self.__plot_training(history_tl)
 
-        print("开始微调:\n")
-
-#         # fine-tuning
+        print('Fine-tuning...')
         self.__setup_to_fine_tune(model, model)
     
-        history_tl = model.fit(self.x_train, self.y_train,
-                    batch_size=batch_size,
-                    epochs=epochs,
-                    validation_data=(self.x_valid, self.y_valid),
-                    shuffle=True)
+        history_tl = model.fit(self.x_train,
+                               self.y_train,
+                               batch_size=batch_size,
+                               epochs=epochs,
+                               validation_data=(self.x_valid, self.y_valid),
+                               shuffle=True)
+        self.__plot_training(history_tl)
 
+        print('Model saving...')
         model.save(self.model_file)
-        self.history_tl = history_tl
+        print('Completed')
         self.model = model
         
     def plot_train(self):
-        self.__plot_training(self.model)
+        self.__plot_training(self.history_tl)
     
     def predict(self, image_path):
         img_array = keras_image_load(image_path, self.resize_img_shape)
