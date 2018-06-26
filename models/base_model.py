@@ -41,3 +41,7 @@ class BaseModel(object):
     @abstractmethod
     def run_model(self):
         pass
+
+    @abstractmethod
+    def predict(self, image_path):
+        pass
