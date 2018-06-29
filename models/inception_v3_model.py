@@ -25,6 +25,7 @@ class InceptionV3Model(BaseModel):
         self.y_train = None
         self.y_valid = None
         self.history_tl = None
+        self.model = None
         self.generator = ImageDataGenerator(preprocessing_function=preprocess_input,
                                         rotation_range=30,
                                         width_shift_range=0.2,
